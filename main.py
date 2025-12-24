@@ -372,40 +372,32 @@ class SimpleTaskManager(QMainWindow):
         QTimer.singleShot(1000, self.check_reminders)
 
     def setup_tray_icon(self):
-        try:
-            if QSystemTrayIcon.isSystemTrayAvailable():
-                self.tray_icon = QSystemTrayIcon(self)
-                self.tray_icon.setIcon(QIcon("icons8.png"))
-                self.tray_icon.setToolTip("Менеджер задач")
 
-                tray_menu = QMenu()
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray_icon = QSystemTrayIcon(self)
+            self.tray_icon.setIcon(QIcon("icons8.png"))
+            self.tray_icon.setToolTip("Менеджер задач")
 
-                show_action = QAction("Показать", self)
-                show_action.triggered.connect(self.show_window)
-                tray_menu.addAction(show_action)
+            tray_menu = QMenu()
 
-                hide_action = QAction("Скрыть", self)
-                hide_action.triggered.connect(self.hide_window)
-                tray_menu.addAction(hide_action)
+            show_action = QAction("Показать", self)
+            show_action.triggered.connect(self.show_window)
+            tray_menu.addAction(show_action)
 
-                tray_menu.addSeparator()
+            hide_action = QAction("Скрыть", self)
+            hide_action.triggered.connect(self.hide_window)
+            tray_menu.addAction(hide_action)
 
-                check_reminders_action = QAction("Проверить напоминания", self)
-                check_reminders_action.triggered.connect(self.check_reminders)
-                tray_menu.addAction(check_reminders_action)
+            tray_menu.addSeparator()
 
-                tray_menu.addSeparator()
+            quit_action = QAction("Выход", self)
+            quit_action.triggered.connect(self.quit_application)
+            tray_menu.addAction(quit_action)
 
-                quit_action = QAction("Выход", self)
-                quit_action.triggered.connect(self.quit_application)
-                tray_menu.addAction(quit_action)
+            self.tray_icon.setContextMenu(tray_menu)
+            self.tray_icon.activated.connect(self.tray_icon_activated)
+            self.tray_icon.show()
 
-                self.tray_icon.setContextMenu(tray_menu)
-                self.tray_icon.activated.connect(self.tray_icon_activated)
-                self.tray_icon.show()
-
-        except Exception:
-            print("Ошибка")
 
     def setup_ui(self):
         self.setWindowTitle("Менеджер задач")
@@ -607,64 +599,61 @@ class SimpleTaskManager(QMainWindow):
         self.stats_label.setText(stats_text)
 
     def check_reminders(self):
-        try:
-            if not hasattr(self, 'tray_icon') or not self.tray_icon.isVisible():
-                return
+    
+        if not hasattr(self, 'tray_icon') or not self.tray_icon.isVisible():
+            return
 
-            now = datetime.now()
-            today = now.date()
-            current_time = now.strftime("%H:%M")
+        now = datetime.now()
+        today = now.date()
+        current_time = now.strftime("%H:%M")
 
-            for task in self.db.get_all_tasks():
-                if task['is_completed']:
-                    continue
+        for task in self.db.get_all_tasks():
+            if task['is_completed']:
+                continue
 
-                task_id = task['id']
-                deadline = datetime.fromisoformat(task['deadline']).date()
-                reminder_time = task.get('reminder_time', '09:00')
-                days_left = (deadline - today).days
+            task_id = task['id']
+            deadline = datetime.fromisoformat(task['deadline']).date()
+            reminder_time = task.get('reminder_time', '09:00')
+            days_left = (deadline - today).days
 
-                reminder_key = f"{task_id}_{today}_{reminder_time}"
+            reminder_key = f"{task_id}_{today}_{reminder_time}"
 
-                if days_left < 0:
-                    overdue_key = f"{task_id}_{today}_overdue"
-                    if overdue_key not in self.sent_reminders:
-                        self.tray_icon.showMessage(
-                            "⚠️ Просроченная задача",
-                            f"Задача '{task['title']}' просрочена!",
-                            QSystemTrayIcon.MessageIcon.Warning,
-                            5000
-                        )
-                        self.sent_reminders.add(overdue_key)
+            if days_left < 0:
+                overdue_key = f"{task_id}_{today}_overdue"
+                if overdue_key not in self.sent_reminders:
+                    self.tray_icon.showMessage(
+                        "Просроченная задача",
+                        f"Задача '{task['title']}' просрочена!",
+                        QSystemTrayIcon.MessageIcon.Warning,
+                        5000
+                    )
+                    self.sent_reminders.add(overdue_key)
 
-                elif days_left == 0 and current_time == reminder_time:
-                    if reminder_key not in self.sent_reminders:
-                        self.tray_icon.showMessage(
-                            "⏰ Напоминание",
-                            f"Сегодня в {reminder_time}: '{task['title']}'",
-                            QSystemTrayIcon.MessageIcon.Information,
-                            5000
-                        )
-                        self.sent_reminders.add(reminder_key)
+            elif days_left == 0 and current_time == reminder_time:
+                if reminder_key not in self.sent_reminders:
+                    self.tray_icon.showMessage(
+                        "Напоминание",
+                        f"Сегодня в {reminder_time}: '{task['title']}'",
+                        QSystemTrayIcon.MessageIcon.Information,
+                        5000
+                    )
+                    self.sent_reminders.add(reminder_key)
 
-                elif days_left == 1 and current_time == "09:00":
-                    tomorrow_key = f"{task_id}_{today}_tomorrow"
-                    if tomorrow_key not in self.sent_reminders:
-                        self.tray_icon.showMessage(
-                            "📅 Задача на завтра",
-                            f"Завтра в {reminder_time}: '{task['title']}'",
-                            QSystemTrayIcon.MessageIcon.Information,
-                            5000
-                        )
-                        self.sent_reminders.add(tomorrow_key)
+            elif days_left == 1 and current_time == "09:00":
+                tomorrow_key = f"{task_id}_{today}_tomorrow"
+                if tomorrow_key not in self.sent_reminders:
+                    self.tray_icon.showMessage(
+                        "Задача на завтра",
+                        f"Завтра в {reminder_time}: '{task['title']}'",
+                        QSystemTrayIcon.MessageIcon.Information,
+                        5000
+                    )
+                    self.sent_reminders.add(tomorrow_key)
 
-            current_keys = list(self.sent_reminders)
-            for key in current_keys:
-                if str(today) not in key and str(today - date.resolution) not in key:
-                    self.sent_reminders.remove(key)
-
-        except Exception as e:
-            print(f"Ошибка при проверке напоминаний: {e}")
+        current_keys = list(self.sent_reminders)
+        for key in current_keys:
+            if str(today) not in key and str(today - date.resolution) not in key:
+                self.sent_reminders.remove(key)
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
